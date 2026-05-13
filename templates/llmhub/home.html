@@ -1,0 +1,191 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Nexa</title>
+  <link rel="stylesheet" href="{% static 'llmhub/styles.css' %}">
+</head>
+<body class="chat-body">
+  <aside class="mini-sidebar" id="miniSidebar" aria-label="Collapsed sidebar">
+    <button class="mini-brand" type="button" id="openSidebar" title="Open sidebar">
+      <img src="{% static 'llmhub/nexa-mark.png' %}" alt="Nexa">
+    </button>
+    <a class="mini-icon" href="{% url 'home' %}" title="New chat">+</a>
+    <button class="mini-icon" type="button" id="miniSearch" title="Search chats">&#8981;</button>
+    <div class="mini-spacer"></div>
+    <button class="mini-avatar" type="button" title="{{ request.user.username }}">{{ request.user.username|first|default:"u"|upper }}</button>
+  </aside>
+
+  <aside class="sidebar">
+    <div class="brand-row">
+      <a class="brand-logo" href="{% url 'home' %}" aria-label="Nexa home">
+        <img src="{% static 'llmhub/nexa-logo.png' %}" alt="Nexa">
+      </a>
+      <button class="icon-btn" type="button" id="closeSidebar" title="Close sidebar">&#10005;</button>
+    </div>
+
+    <nav class="side-nav">
+      <a class="nav-item active" href="{% url 'home' %}"><span>+</span> New chat</a>
+      <button class="nav-item nav-button" type="button" id="openSearch"><span>&#8981;</span> Search chats</button>
+    </nav>
+
+    <section class="recents">
+      <h2>Recents</h2>
+      {% for log in logs %}
+        <button class="recent-chat" type="button" title="{{ log.question }}" data-question="{{ log.question }}" data-answer="{{ log.answer|default:log.error }}" data-meta="{{ log.provider }} / {{ log.model }}">
+          {{ log.question|truncatechars:34 }}
+        </button>
+      {% empty %}
+        <p>No chats yet</p>
+      {% endfor %}
+    </section>
+
+    <div class="account-card">
+      <div class="avatar">{{ request.user.username|first|default:"u"|lower }}</div>
+      <div>
+        <strong>{{ request.user.username }}</strong>
+        <span>Free</span>
+      </div>
+      <form method="post" action="{% url 'logout' %}">
+        {% csrf_token %}
+        <button type="submit" title="Logout">Logout</button>
+      </form>
+    </div>
+  </aside>
+
+  <main class="chat-main">
+    <header class="mobile-top">
+      <button class="mobile-menu-btn" type="button" id="mobileOpenSidebar" aria-label="Open sidebar">=</button>
+      <a class="mobile-brand" href="{% url 'home' %}" aria-label="Nexa home">
+        <img src="{% static 'llmhub/nexa-logo.png' %}" alt="Nexa">
+      </a>
+      <a class="mobile-new-chat" href="{% url 'home' %}" aria-label="New chat">+</a>
+    </header>
+
+    <section class="conversation">
+      <div class="answer-panel" id="answerPanel">
+        <div class="answer-meta" id="status">Ready</div>
+        <div class="chat-transcript" id="chatTranscript"></div>
+      </div>
+
+      <form id="askForm" class="prompt-dock">
+        {% csrf_token %}
+        <div class="prompt-row">
+          <div class="plus-menu-wrap">
+            <button class="plus-btn" type="button" id="openAddMenu" title="Add">+</button>
+            <div class="add-menu" id="addMenu" hidden>
+              <button type="button" data-question-type="coding"><span class="menu-icon">{ }</span>Coding</button>
+              <button type="button" data-question-type="summarize"><span class="menu-icon">≡</span>Summarize</button>
+              <button type="button" data-question-type="translate"><span class="menu-icon">文</span>Translate</button>
+              <span class="add-menu-divider"></span>
+              <button type="button" data-action="create-image"><span class="menu-icon">▧</span>Create image</button>
+              <button type="button" data-action="upload-file"><span class="menu-icon">↥</span>Upload image & file</button>
+              <button type="button" data-action="recent-file"><span class="menu-icon">◷</span>Recent file</button>
+              <button type="button" data-action="deep-research"><span class="menu-icon">⌕</span>Deep research</button>
+            </div>
+            <input id="fileUpload" type="file" accept="image/*,.pdf,.txt,.doc,.docx" multiple hidden>
+          </div>
+          <textarea id="question" name="question" rows="1" placeholder="Ask anything"></textarea>
+          <select id="llmQuickSelect" class="llm-quick-select" title="Choose LLM">
+            <option value="" selected>Choose LLM</option>
+            {% for provider in providers %}
+              <option
+                value="{{ provider.key }}"
+                data-model="{{ provider.default_model }}"
+                data-configured="{{ provider.configured|yesno:'true,false' }}"
+                {% if provider.key != "groq" %}disabled{% endif %}
+              >
+                {{ provider.label }}{% if provider.key != "groq" %} - muted{% endif %}
+              </option>
+            {% endfor %}
+          </select>
+          <button class="voice-btn" type="submit" title="Ask" aria-label="Send">&#8593;</button>
+        </div>
+
+        <div class="control-row">
+          <select id="questionType" name="question_type" title="Question type">
+            {% for value, label in question_types %}
+              {% if value != "general" %}
+                <option value="{{ value }}"{% if value == "coding" %} selected{% endif %}>{{ label }}</option>
+              {% endif %}
+            {% endfor %}
+          </select>
+
+          <select id="provider" name="provider" title="Provider">
+            {% for provider in providers %}
+              <option value="{{ provider.key }}" data-model="{{ provider.default_model }}" data-configured="{{ provider.configured|yesno:'true,false' }}">
+                {{ provider.label }}{% if provider.needs_api_key and not provider.configured %} - no key{% endif %}
+              </option>
+            {% endfor %}
+          </select>
+
+          <select id="model" name="model" title="Model">
+            {% for provider in providers %}
+              <option value="{{ provider.default_model }}" data-provider="{{ provider.key }}">{{ provider.label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </form>
+
+      <h1 id="welcomeTitle">How can Nexa.ai assist you today?</h1>
+    </section>
+  </main>
+
+  <div class="modal-backdrop" id="shareModal" hidden>
+    <section class="share-modal" role="dialog" aria-modal="true" aria-labelledby="shareTitle">
+      <div class="share-head">
+        <h2 id="shareTitle">Share Chat</h2>
+        <button class="icon-btn" type="button" id="closeShare" aria-label="Close share">x</button>
+      </div>
+      <div class="share-preview">
+        <p id="sharePreview"></p>
+        <strong>Nexa</strong>
+      </div>
+      <div class="share-actions">
+        <button type="button" data-share="copy"><span class="share-icon copy-icon">↗</span>Copy link</button>
+        <button type="button" data-share="x"><span class="share-icon x-icon">X</span>X</button>
+        <button type="button" data-share="linkedin"><span class="share-icon linkedin-icon">in</span>LinkedIn</button>
+        <button type="button" data-share="reddit"><span class="share-icon reddit-icon">r</span>Reddit</button>
+        <button type="button" data-share="whatsapp">
+          <span class="share-icon whatsapp-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M12 3a8.7 8.7 0 0 0-7.4 13.3L4 21l4.9-1.3A8.8 8.8 0 1 0 12 3z"/>
+              <path d="M8.8 8.3c.2-.4.4-.4.7-.4h.5c.2 0 .4 0 .5.4l.7 1.7c.1.2.1.4 0 .5l-.5.7c-.1.1-.2.3-.1.5.3.6.8 1.2 1.4 1.7.6.5 1.2.8 1.9 1 .2.1.3 0 .5-.1l.7-.8c.2-.2.4-.2.6-.1l1.7.8c.2.1.4.3.4.5 0 .5-.2 1.3-.6 1.7-.5.5-1.5.7-2.7.3-1.8-.5-3.3-1.5-4.6-2.8-1.3-1.3-2.3-2.8-2.8-4.5-.3-1.1 0-2 .5-2.5.2-.2.7-.5 1.2-.5z"/>
+            </svg>
+          </span>
+          WhatsApp
+        </button>
+      </div>
+    </section>
+  </div>
+
+  <div class="modal-backdrop" id="searchModal" hidden>
+    <section class="search-modal" role="dialog" aria-modal="true" aria-labelledby="searchTitle">
+      <div class="search-head">
+        <h2 id="searchTitle">Search chats</h2>
+        <button class="icon-btn" type="button" id="closeSearch" aria-label="Close search">x</button>
+      </div>
+      <input id="historySearch" type="search" placeholder="Search your chat history" autocomplete="off">
+      <div class="history-results" id="historyResults">
+        {% for log in search_logs %}
+          <button
+            class="history-result"
+            type="button"
+            data-question="{{ log.question }}"
+            data-answer="{{ log.answer|default:log.error }}"
+            data-meta="{{ log.provider }} / {{ log.model }}"
+          >
+            <strong>{{ log.question|truncatechars:80 }}</strong>
+            <span>{{ log.created_at|date:"M d, Y H:i" }}</span>
+          </button>
+        {% empty %}
+          <p class="empty-history">No chats yet</p>
+        {% endfor %}
+      </div>
+    </section>
+  </div>
+  <script src="{% static 'llmhub/app.js' %}"></script>
+</body>
+</html>
