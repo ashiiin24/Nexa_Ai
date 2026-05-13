@@ -43,8 +43,10 @@ def provider_options():
             "label": config.label,
             "default_model": config.default_model,
             "needs_api_key": config.needs_api_key,
-            "configured": not config.needs_api_key or bool(os.getenv(PROVIDER_API_KEYS.get(config.key, "")).strip()),
-        }
+            "configured": not config.needs_api_key or bool(
+                (os.getenv(PROVIDER_API_KEYS.get(config.key, "")) or "").strip()
+            ), 
+       }
         for config in PROVIDERS.values()
     ]
 
